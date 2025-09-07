@@ -128,8 +128,8 @@ export default function DepartmentHeadRolePage() {
       })
       if (response.ok) {
         const data = await response.json()
-        // Filter only department head (role_id = 4)
-        const departmentHeadData = data.filter((user: User) => user.role_id === 5 )
+        // Filter only department head (role_id = 3)
+        const departmentHeadData = data.filter((user: User) => user.role_id === 3 )
         setDepartmentHead(departmentHeadData)
         console.log('✅ Department head fetched successfully:', departmentHeadData.length, 'department head')
       } else {
@@ -237,7 +237,7 @@ export default function DepartmentHeadRolePage() {
       const payload = {
         ...formData,
         tenant_secret_code: tenantSecretKey,
-        role_id: 5, //       role ID
+        role_id: 3, // Department Head role ID
         department_id: parseInt(formData.department_id)
       }
       
@@ -285,7 +285,7 @@ export default function DepartmentHeadRolePage() {
     try {
       const payload = {
         name: formData.name,
-        role_id: 5, // Department   head role ID (cannot be changed)
+        role_id: 3, // Department Head role ID (cannot be changed)
         department_id: parseInt(formData.department_id),
         is_active: editingUser.is_active,
         custom_permissions: editingUser.custom_permissions,

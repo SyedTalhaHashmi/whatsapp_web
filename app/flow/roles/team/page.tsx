@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -90,7 +90,7 @@ export default function TeamRolePage() {
   }
 
   // Fetch roles
-  const fetchRoles = async () => {
+  const fetchRoles = useCallback(async () => {
     try {
       const response = await fetch(`${getBaseUrl()}/role/`, {
         headers: {
@@ -105,10 +105,10 @@ export default function TeamRolePage() {
       console.error('Error fetching roles:', error)
       toast.error('Failed to fetch roles')
     }
-  }
+  }, [])
 
   // Fetch Team  only
-  const fetchTeam = async () => {
+  const fetchTeam = useCallback(async () => {
     if (!tenantId) {
       console.error('❌ Cannot fetch team: No tenant ID available')
       toast.error('No tenant ID found. Please sign in again.')
@@ -128,8 +128,8 @@ export default function TeamRolePage() {
       })
       if (response.ok) {
         const data = await response.json()
-        // Filter only team (role_id = 4)
-        const teamData = data.filter((user: User) => user.role_id === 7 )
+        // Filter only team (role_id = 5)
+        const teamData = data.filter((user: User) => user.role_id === 5 )
         setTeam(teamData)
         console.log('✅ Team fetched successfully:', teamData.length, 'team')
       } else {
@@ -142,10 +142,10 @@ export default function TeamRolePage() {
     } finally {
       setUserLoading(false)
     }
-  }
+  }, [tenantId])
 
   // Fetch departments
-  const fetchDepartments = async () => {
+  const fetchDepartments = useCallback(async () => {
     if (!tenantId) return
     
     console.log('Fetching departments with tenant ID:', tenantId)
@@ -168,7 +168,7 @@ export default function TeamRolePage() {
     } catch (error) {
       console.error('Error fetching departments:', error)
     }
-  }
+  }, [tenantId])
 
   // Copy tenant secret to clipboard
   const copyTenantSecret = async () => {
@@ -237,7 +237,7 @@ export default function TeamRolePage() {
       const payload = {
         ...formData,
         tenant_secret_code: tenantSecretKey,
-        role_id: 7, // Team role ID
+        role_id: 5, // Team role ID
         department_id: parseInt(formData.department_id)
       }
       
@@ -285,7 +285,7 @@ export default function TeamRolePage() {
     try {
       const payload = {
         name: formData.name,
-        role_id: 7, // Team role ID (cannot be changed)
+        role_id: 5, // Team role ID (cannot be changed)
         department_id: parseInt(formData.department_id),
         is_active: editingUser.is_active,
         custom_permissions: editingUser.custom_permissions,

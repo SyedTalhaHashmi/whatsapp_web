@@ -100,7 +100,7 @@ export function Sidebar({ className }: SidebarProps) {
               { label: "Knowledge Base", link: "/flow/knowledge", badge: "new" },
               { label: "Departments", link: "/flow/department", badge: "new" },
               { label: "Vector Database", link: "/flow/vector-database", badge: "new" },
-              { label: "AI Configuration", link: "/flow/configuration", badge: "new" },
+             // { label: "AI Configuration", link: "/flow/configuration", badge: "new" },
               { label: "All Settings", link: "/flow/all-settings", badge: "new" },
             ],
           },

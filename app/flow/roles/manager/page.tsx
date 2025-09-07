@@ -128,8 +128,8 @@ export default function ManagerRolePage() {
       })
       if (response.ok) {
         const data = await response.json()
-        // Filter only managers (role_id = 4)
-        const managersData = data.filter((user: User) => user.role_id === 4)
+        // Filter only managers (role_id = 2)
+        const managersData = data.filter((user: User) => user.role_id === 2)
         setManagers(managersData)
         console.log('✅ Managers fetched successfully:', managersData.length, 'managers')
       } else {
@@ -237,7 +237,7 @@ export default function ManagerRolePage() {
       const payload = {
         ...formData,
         tenant_secret_code: tenantSecretKey,
-        role_id: 4, // Manager role ID
+        role_id: 2, // Manager role ID
         department_id: parseInt(formData.department_id)
       }
       
@@ -285,7 +285,7 @@ export default function ManagerRolePage() {
     try {
       const payload = {
         name: formData.name,
-        role_id: 4, // Manager role ID (cannot be changed)
+        role_id: 2, // Manager role ID (cannot be changed)
         department_id: parseInt(formData.department_id),
         is_active: editingUser.is_active,
         custom_permissions: editingUser.custom_permissions,

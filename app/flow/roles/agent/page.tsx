@@ -128,8 +128,8 @@ export default function AgentRolePage() {
       })
       if (response.ok) {
         const data = await response.json()
-        // Filter only agents (role_id = 2)
-        const agentsData = data.filter((user: User) => user.role_id === 2)
+        // Filter only agents (role_id = 4)
+        const agentsData = data.filter((user: User) => user.role_id === 4)
         setAgents(agentsData)
         console.log('✅ Agents fetched successfully:', agentsData.length, 'agents')
       } else {
@@ -237,7 +237,7 @@ export default function AgentRolePage() {
       const payload = {
         ...formData,
         tenant_secret_code: tenantSecretKey,
-        role_id: 2, // Agent role ID
+        role_id: 4, // Agent role ID
         department_id: parseInt(formData.department_id)
       }
       
@@ -285,7 +285,7 @@ export default function AgentRolePage() {
     try {
       const payload = {
         name: formData.name,
-        role_id: 2, // Agent role ID (cannot be changed)
+        role_id: 4, // Agent role ID (cannot be changed)
         department_id: parseInt(formData.department_id),
         is_active: editingUser.is_active,
         custom_permissions: editingUser.custom_permissions,
