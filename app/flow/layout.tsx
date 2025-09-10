@@ -38,7 +38,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import Image from "next/image"
-import { ThemeProvider } from "@/components/theme-provider"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Card, CardContent } from "@/components/ui/card"
 import { NotificationModal } from "@/components/shared/notification-modal"
@@ -62,7 +61,7 @@ export function Sidebar({ className }: SidebarProps) {
   const [isMobile, setIsMobile] = useState(false)
   const [notificationOpen, setNotificationOpen] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)
-  const [openSections, setOpenSections] = useState({
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     shared: true,
     quiz: true,
     services: true,
@@ -212,7 +211,7 @@ export function Sidebar({ className }: SidebarProps) {
     }
   }
 
-  const toggleSection = (key: keyof typeof openSections) => {
+  const toggleSection = (key: string) => {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
@@ -291,7 +290,7 @@ export function Sidebar({ className }: SidebarProps) {
     children,
   }: {
     title: string;
-    openKey: keyof typeof openSections;
+    openKey: string;
     children: React.ReactNode;
   }) => (
     <div className="mb-2">
@@ -405,7 +404,7 @@ export function Sidebar({ className }: SidebarProps) {
           {/* Services Navigation */}
           <div className="flex-1 px-4 pb-3 text-md space-y-4 overflow-y-auto">
             {servicesSections.map((section, sectionIndex) => (
-              <Group key={sectionIndex} title={section.title} openKey={section.key as keyof typeof openSections}>
+              <Group key={sectionIndex} title={section.title} openKey={section.key}>
                 {section.items.map((item, itemIndex) => (
                   <Item
                     key={itemIndex}
@@ -469,15 +468,12 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <div className="flex min-h-screen">
-  
-        <Sidebar />
-        <main className="flex-1 md:ml-[230px]">
-          <Topbar />
-          <SupportModalProvider>{children}</SupportModalProvider>
-        </main>
-      </div>
-    </ThemeProvider>
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <main className="flex-1 md:ml-[230px]">
+        <Topbar />
+        <SupportModalProvider>{children}</SupportModalProvider>
+      </main>
+    </div>
   )
 }

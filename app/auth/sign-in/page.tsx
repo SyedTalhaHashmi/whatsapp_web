@@ -62,18 +62,18 @@ export default function SignInPage() {
       // Fetch user permissions
       try {
         const userID = sessionStorage.getItem('userID')
-        const permissionsResponse = await axios.get(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/permission/user/${userID}/permissions`
-        )
+        // const permissionsResponse = await axios.get(
+        //   `${process.env.NEXT_PUBLIC_API_BASE_URL}/permission/user/${userID}/permissions`
+        // )
         
-        const permissionsData = permissionsResponse.data
+        // const permissionsData = permissionsResponse.data
         
         // Store user permissions
-        sessionStorage.setItem('userPermissions', JSON.stringify(permissionsData.permissions || null))
+        // sessionStorage.setItem('userPermissions', JSON.stringify(permissionsData.permissions || null))
         
         // Store admin permissions (from user_role if present)
-        const adminPermissions = permissionsData.user_role?.permissions || null
-        sessionStorage.setItem('adminPermissions', JSON.stringify(adminPermissions))
+        // const adminPermissions = permissionsData.user_role?.permissions || null
+        // sessionStorage.setItem('adminPermissions', JSON.stringify(adminPermissions))
         
         // Store user role data
         
@@ -86,7 +86,7 @@ export default function SignInPage() {
        
     
       }
-      if(response.status === 200 ){
+      if( sessionStorage.getItem('tenantId') ){
         
         router.push('/flow/setup')
       }
@@ -111,7 +111,7 @@ export default function SignInPage() {
       }
 
     } finally {
-      // router.push('/flow/chats')
+
     }
   }
 
@@ -231,7 +231,7 @@ export default function SignInPage() {
             <Button
               type="submit"
               className="w-full bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 text-white font-medium py-3 rounded-md transition-all duration-200 transform hover:scale-[1.02]"
-              onClick={() => router.push('/flow/chats')}
+         
             >
               Log In
             </Button>

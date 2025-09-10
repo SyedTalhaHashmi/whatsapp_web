@@ -218,7 +218,7 @@ export default function KnowledgePage() {
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/knowledge-base/upload`, {
         method: 'POST',
-        headers: { 'ngrok-skip-browser-warning': '69420' },
+        
         body: formData
       })
 

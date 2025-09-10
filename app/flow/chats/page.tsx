@@ -64,6 +64,18 @@ export default function ChatsPage() {
   const [agentJoned, setAgentJoned] = useState<boolean>(false)
   const [currentJoinedConversationId, setCurrentJoinedConversationId] = useState<string | number | null>(null)
   
+  // Connection state management
+  const [isPageVisible, setIsPageVisible] = useState<boolean>(true)
+  const [isPageFocused, setIsPageFocused] = useState<boolean>(true)
+  const [hasInitialized, setHasInitialized] = useState<boolean>(false)
+  const wsConnectionsRef = useRef<{ dept: (() => void) | null; tenant: (() => void) | null; chat: (() => void) | null }>({
+    dept: null,
+    tenant: null,
+    chat: null
+  })
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const maxRetryDelay = 30000 // 30 seconds max retry delay
+  
   // Auto-scroll to bottom when messages change
   const scrollToBottom = () => {
     if (chatScrollRef.current) {
@@ -74,10 +86,109 @@ export default function ChatsPage() {
     }
   }
 
+  // Page visibility and focus detection - only for this chats page
   useEffect(() => {
+    const checkIfOnChatsPage = () => {
+      return window.location.pathname.includes('/chats')
+    }
+
+    const handleVisibilityChange = () => {
+      const isVisible = !document.hidden
+      const isOnChatsPage = checkIfOnChatsPage()
+      
+      setIsPageVisible(isVisible && isOnChatsPage)
+      
+      if (isVisible && isOnChatsPage) {
+        // Page became visible and we're on chats page, restart connections if needed
+        console.log('Chats page became visible, checking connections...')
+        setHasInitialized(true)
+      } else {
+        // Page became hidden or user navigated away, cleanup connections
+        console.log('Chats page became hidden or user navigated away, cleaning up connections...')
+        cleanupWebSocketConnections()
+      }
+    }
+
+    const handleFocus = () => {
+      const isOnChatsPage = checkIfOnChatsPage()
+      console.log('Page gained focus, on chats page:', isOnChatsPage)
+      setIsPageFocused(document.hasFocus() && isOnChatsPage)
+      if (isOnChatsPage) {
+        setHasInitialized(true)
+      }
+    }
+
+    const handleBlur = () => {
+      console.log('Page lost focus')
+      setIsPageFocused(false)
+    }
+
+    // Handle route changes (for SPA navigation)
+    const handleRouteChange = () => {
+      const isOnChatsPage = checkIfOnChatsPage()
+      // console.log('Route changed, on chats page:', isOnChatsPage)
+      
+      if (!isOnChatsPage) {
+        // User navigated away from chats page, cleanup connections
+        // console.log('User navigated away away from chats page, cleaning up connections...')
+        cleanupWebSocketConnections()
+        setIsPageVisible(false)
+        setIsPageFocused(false)
+        setHasInitialized(false)
+      } else {
+        // User navigated to chats page, initialize if visible and focused
+        const isVisible = !document.hidden
+        const isFocused = document.hasFocus()
+        setIsPageVisible(isVisible)
+        setIsPageFocused(isFocused)
+        setHasInitialized(isVisible && isFocused)
+      }
+    }
+
+    // Check if we're on the chats page initially
+    const isOnChatsPage = checkIfOnChatsPage()
+    setIsPageVisible(!document.hidden && isOnChatsPage)
+    setIsPageFocused(document.hasFocus() && isOnChatsPage)
+    setHasInitialized(isOnChatsPage)
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+    window.addEventListener('blur', handleBlur)
+    
+    // Listen for route changes (popstate for back/forward, and custom events for SPA navigation)
+    window.addEventListener('popstate', handleRouteChange)
+    
+    // For Next.js router events (if using Next.js router)
+    if (typeof window !== 'undefined' && window.history) {
+      const originalPushState = window.history.pushState
+      const originalReplaceState = window.history.replaceState
+      
+      window.history.pushState = function(...args) {
+        originalPushState.apply(this, args)
+        setTimeout(handleRouteChange, 0)
+      }
+      
+      window.history.replaceState = function(...args) {
+        originalReplaceState.apply(this, args)
+        setTimeout(handleRouteChange, 0)
+      }
+    }
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('blur', handleBlur)
+      window.removeEventListener('popstate', handleRouteChange)
+    }
+  }, [])
+
+  useEffect(() => {
+    // Only fetch data when page is focused, visible, and has been initialized
+    if (!isPageFocused || !isPageVisible || !hasInitialized) return
+
     // Get user role and department info
-      const role = getSessionStorageItem('userRole') || ''
-  const deptId = getSessionStorageItem('departmentId') || ''
+    const role = getSessionStorageItem('userRole') || ''
+    const deptId = getSessionStorageItem('departmentId') || ''
     setUserRole(role)
     
     // Set department filter based on user role
@@ -92,14 +203,15 @@ export default function ChatsPage() {
         setLoading(true)
         setError(null)
 
-            const tenantID = getSessionStorageItem('tenantID')
-    const departmentID = getSessionStorageItem('departmentID')
+        const tenantID = getSessionStorageItem('tenantID')
+        const departmentID = getSessionStorageItem('departmentID')
 
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
         if (!baseUrl) {
           throw new Error('Missing NEXT_PUBLIC_API_BASE_URL')
         }
 
+        // console.log('Fetching inbox data...')
         const response = await axios.get(`${baseUrl}/inbox`, {
           params: {
             tenant_id: getSessionStorageItem('tenantId'),
@@ -107,7 +219,6 @@ export default function ChatsPage() {
             limit: 50,
             offset: 0,
           },
-          headers: { 'ngrok-skip-browser-warning': '69420' },
         })
 
         const data = response?.data
@@ -131,8 +242,9 @@ export default function ChatsPage() {
           }
         })
         setDepartments(deptData)
+        // console.log('Inbox data fetched successfully')
       } catch (err: any) {
-        console.error('Failed to fetch inbox:', err)
+        // console.error('Failed to fetch inbox:', err)
         setError(err?.message || 'Failed to fetch inbox')
       } finally {
         setLoading(false)
@@ -140,7 +252,7 @@ export default function ChatsPage() {
     }
 
     fetchInbox()
-  }, [])
+  }, [isPageFocused, isPageVisible, hasInitialized])
 
   const uiChats = useMemo(() => {
     const source = chats.length ? chats : mockChats
@@ -332,6 +444,27 @@ export default function ChatsPage() {
     })
   }
 
+  // Cleanup function for WebSocket connections
+  const cleanupWebSocketConnections = () => {
+    if (wsConnectionsRef.current.dept) {
+      wsConnectionsRef.current.dept()
+      wsConnectionsRef.current.dept = null
+    }
+    if (wsConnectionsRef.current.tenant) {
+      wsConnectionsRef.current.tenant()
+      wsConnectionsRef.current.tenant = null
+    }
+    if (wsConnectionsRef.current.chat) {
+      wsConnectionsRef.current.chat()
+      wsConnectionsRef.current.chat = null
+    }
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current)
+      retryTimeoutRef.current = null
+    }
+    setWsOpenCount(0)
+  }
+
   const openWS = (
     url: string,
     { onMessage, onOpen, onClose }: { onMessage?: (evt: MessageEvent) => void; onOpen?: () => void; onClose?: () => void } = {}
@@ -339,26 +472,84 @@ export default function ChatsPage() {
     let ws: WebSocket
     let heartbeat: ReturnType<typeof setInterval> | undefined
     let retryMs = 1000
+    let isConnecting = false
+    
     const connect = () => {
-      ws = new WebSocket(url)
-      ws.onopen = () => {
-        heartbeat = setInterval(() => {
-          try { ws.send(JSON.stringify({ type: 'ping' })) } catch {}
-        }, 20000)
-        retryMs = 1000
-        onOpen && onOpen()
+      // Don't connect if page is not visible, focused, already connecting, or not on chats page
+      const isOnChatsPage = window.location.pathname.includes('/chats')
+      if (!isPageVisible || !isPageFocused || isConnecting || !isOnChatsPage) {
+        // console.log('WebSocket connection skipped:', { isPageVisible, isPageFocused, isConnecting, isOnChatsPage })
+        return
       }
-      ws.onmessage = (evt) => onMessage && onMessage(evt)
-      ws.onclose = () => {
-        if (heartbeat) clearInterval(heartbeat)
-        onClose && onClose()
-        setTimeout(connect, retryMs)
-        retryMs = Math.min(retryMs * 2, 15000)
+      
+      isConnecting = true
+      // console.log('Attempting WebSocket connection to:', url)
+      
+      try {
+        ws = new WebSocket(url)
+        
+        ws.onopen = () => {
+          // console.log('WebSocket connected to:', url)
+          isConnecting = false
+          heartbeat = setInterval(() => {
+            try { 
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'ping' })) 
+              }
+            } catch (e) {
+              console.warn('Failed to send ping:', e)
+            }
+          }, 20000)
+          retryMs = 1000
+          onOpen && onOpen()
+        }
+        
+        ws.onmessage = (evt) => onMessage && onMessage(evt)
+        
+        ws.onclose = () => {
+          // console.log('WebSocket closed:', url)
+          isConnecting = false
+          if (heartbeat) clearInterval(heartbeat)
+          onClose && onClose()
+          
+          // Only retry if page is visible, focused, not manually closed, and still on chats page
+          const isOnChatsPage = window.location.pathname.includes('/chats')
+          if (isPageVisible && isPageFocused && isOnChatsPage && retryMs < maxRetryDelay) {
+            retryTimeoutRef.current = setTimeout(() => {
+              const stillOnChatsPage = window.location.pathname.includes('/chats')
+              if (isPageVisible && isPageFocused && stillOnChatsPage) {
+                connect()
+              }
+            }, retryMs)
+            retryMs = Math.min(retryMs * 2, maxRetryDelay)
+          }
+        }
+        
+        ws.onerror = (error) => {
+          // console.error('WebSocket error:', url, error)
+          isConnecting = false
+          try { ws.close() } catch {}
+        }
+      } catch (error) {
+        // console.error('Failed to create WebSocket:', error)
+        isConnecting = false
       }
-      ws.onerror = () => { try { ws.close() } catch {} }
     }
+    
     connect()
-    return () => { try { if (heartbeat) clearInterval(heartbeat); ws.close() } catch {} }
+    
+    return () => { 
+      try { 
+        if (heartbeat) clearInterval(heartbeat)
+        if (ws) ws.close()
+        if (retryTimeoutRef.current) {
+          clearTimeout(retryTimeoutRef.current)
+          retryTimeoutRef.current = null
+        }
+      } catch (e) {
+        // console.warn('Error closing WebSocket:', e)
+      }
+    }
   }
 
   const parseSessionNumber = (key: string): number | null => {
@@ -375,13 +566,19 @@ export default function ChatsPage() {
   }
 
   const fetchConversation = useCallback(async (conversationId: string | number) => {
+    // Only fetch if page is focused, visible, and on chats page
+    const isOnChatsPage = window.location.pathname.includes('/chats')
+    if (!isPageFocused || !isPageVisible || !isOnChatsPage) return
+    
     try {
       setConversationError(null)
       setConversationLoadingId(conversationId)
       const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
       if (!baseUrl) throw new Error('Missing NEXT_PUBLIC_API_BASE_URL')
+      
+      // console.log('Fetching conversation data for ID:', conversationId)
       const response = await axios.get(`${baseUrl}/conversations/${conversationId}`, {
-        headers: { 'ngrok-skip-browser-warning': '69420' },
+        
       })
               const data = response?.data
         console.log('data', data)
@@ -425,12 +622,12 @@ export default function ChatsPage() {
       messageIdsByConvRef.current[conversationId] = seen
       setConversationsById(prev => ({ ...prev, [conversationId]: { messages: normalizedMessages, meta: data?.conversation ?? null, _raw: data } }))
     } catch (err: any) {
-      console.error('Failed to fetch conversation:', err)
+      // console.error('Failed to fetch conversation:', err)
       setConversationError(err?.message || 'Failed to fetch conversation')
     } finally {
       setConversationLoadingId(null)
     }
-  }, [selectedChatId])
+  }, [selectedChatId, isPageFocused, isPageVisible])
 
   useEffect(() => {
     if (selectedChatId != null) {
@@ -499,8 +696,12 @@ export default function ChatsPage() {
 
   // Inbox WS (dept + tenant) for realtime list updates
   useEffect(() => {
+    // Only connect if page is visible and focused
+    if (!isPageVisible || !isPageFocused) return
+    
     const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
     if (!baseUrl) return
+    
     const wsBase = baseUrl.replace(/^http/, 'ws').replace(/\/+$/, '')
     const deptParams = new URLSearchParams({
       tenant_id: getSessionStorageItem('tenantId') || '',
@@ -512,8 +713,14 @@ export default function ChatsPage() {
       'ngrok-skip-browser-warning': 'true'
     })
 
-    const onOpen = () => setWsOpenCount(n => n + 1)
-    const onClose = () => setWsOpenCount(n => Math.max(0, n - 1))
+    const onOpen = () => {
+      console.log('Inbox WebSocket opened')
+      setWsOpenCount(n => n + 1)
+    }
+    const onClose = () => {
+      console.log('Inbox WebSocket closed')
+      setWsOpenCount(n => Math.max(0, n - 1))
+    }
 
     const applyInboxUpdate = ({ conversation_id, last_message, timestamp, unread_count }: any) => {
       let applied = false
@@ -545,7 +752,7 @@ export default function ChatsPage() {
         try {
           const response = await axios.get(`${baseUrl}/inbox`, {
             params: { tenant_id: getSessionStorageItem('tenantId'), department_id: getSessionStorageItem('departmentId'), limit: 50, offset: 0 },
-            headers: { 'ngrok-skip-browser-warning': '69420' },
+            
           })
           const data = response?.data
           let items: any[] = []
@@ -568,7 +775,7 @@ export default function ChatsPage() {
           try {
             const response = await axios.get(`${baseUrl}/inbox`, {
               params: { tenant_id: getSessionStorageItem('tenantId'), department_id: getSessionStorageItem('departmentId'), limit: 50, offset: 0 },
-              headers: { 'ngrok-skip-browser-warning': '69420' },
+              
             })
             const data = response?.data
             let items: any[] = []
@@ -596,21 +803,36 @@ export default function ChatsPage() {
 
     const stopDept = openWS(`${wsBase}/inbox/ws?${deptParams.toString()}`, { onMessage: handleInboxWs, onOpen, onClose })
     const stopTenant = openWS(`${wsBase}/inbox/ws?${tenantParams.toString()}`, { onMessage: handleInboxWs, onOpen, onClose })
-    return () => { stopDept(); stopTenant() }
-  }, [])
+    
+    // Store cleanup functions
+    wsConnectionsRef.current.dept = stopDept
+    wsConnectionsRef.current.tenant = stopTenant
+    
+    return () => { 
+      stopDept(); 
+      stopTenant()
+      wsConnectionsRef.current.dept = null
+      wsConnectionsRef.current.tenant = null
+    }
+  }, [isPageVisible, isPageFocused])
 
   // Polling fallback when inbox WS is down
   useEffect(() => {
     function start() {
-      if (inboxWsUp) return
+      const isOnChatsPage = window.location.pathname.includes('/chats')
+      if (inboxWsUp || !isPageVisible || !isPageFocused || !isOnChatsPage) return
       stop()
       pollRef.current = setInterval(async () => {
+        // Only poll if page is visible, focused, and still on chats page
+        const stillOnChatsPage = window.location.pathname.includes('/chats')
+        if (!isPageVisible || !isPageFocused || !stillOnChatsPage) return
+        
         try {
           const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
           if (!baseUrl) return
           const response = await axios.get(`${baseUrl}/inbox`, {
             params: { tenant_id: getSessionStorageItem('tenantId'), department_id: getSessionStorageItem('departmentId'), limit: 50, offset: 0 },
-            headers: { 'ngrok-skip-browser-warning': '69420' },
+            
           })
           const data = response?.data
           let items: any[] = []
@@ -627,7 +849,7 @@ export default function ChatsPage() {
     }
     start()
     return stop
-  }, [inboxWsUp])
+  }, [inboxWsUp, isPageVisible, isPageFocused])
 
   // Load AI status from session storage when conversation changes
   useEffect(() => {
@@ -645,7 +867,7 @@ export default function ChatsPage() {
 
   // Chat WS for selected conversation
   useEffect(() => {
-    if (selectedChatId == null) return
+    if (selectedChatId == null || !isPageVisible || !isPageFocused) return
     const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
     if (!baseUrl) return
     const wsBase = baseUrl.replace(/^http/, 'ws').replace(/\/+$/, '')
@@ -706,8 +928,15 @@ export default function ChatsPage() {
     })
     // Load initial conversation details
     fetchConversation(selectedChatId)
-    return stop
-  }, [selectedChatId, fetchConversation])
+    
+    // Store cleanup function
+    wsConnectionsRef.current.chat = stop
+    
+    return () => { 
+      stop()
+      wsConnectionsRef.current.chat = null
+    }
+  }, [selectedChatId, fetchConversation, isPageVisible, isPageFocused])
 
   // Cleanup effect to leave conversation when component unmounts or conversation changes
   useEffect(() => {
@@ -718,6 +947,14 @@ export default function ChatsPage() {
       }
     }
   }, [currentJoinedConversationId])
+
+  // Cleanup all WebSocket connections when component unmounts
+  useEffect(() => {
+    return () => {
+      console.log('Component unmounting, cleaning up all connections...')
+      cleanupWebSocketConnections()
+    }
+  }, [])
 
   const sendMessage = async () => {
     if (!selectedChat || !input.trim()) return
